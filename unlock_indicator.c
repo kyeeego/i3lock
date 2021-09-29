@@ -133,8 +133,7 @@ void draw_image(xcb_pixmap_t bg_pixmap, uint32_t *resolution) {
         }
     }
 
-    if (unlock_indicator &&
-        (unlock_state >= STATE_KEY_PRESSED || auth_state > STATE_AUTH_IDLE)) {
+    if (unlock_indicator) {
         cairo_scale(ctx, scaling_factor, scaling_factor);
         /* Draw a (centered) circle with transparent background. */
         cairo_set_line_width(ctx, 10.0);
@@ -199,71 +198,28 @@ void draw_image(xcb_pixmap_t bg_pixmap, uint32_t *resolution) {
 
         cairo_set_line_width(ctx, 10.0);
 
-        /* Display a (centered) text of the current PAM state. */
-        char *text = NULL;
-        /* We don't want to show more than a 3-digit number. */
-        char buf[4];
-
         cairo_set_source_rgb(ctx, 0, 0, 0);
         cairo_select_font_face(ctx, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-        cairo_set_font_size(ctx, 28.0);
-        switch (auth_state) {
-            case STATE_AUTH_VERIFY:
-                text = "Verifying…";
-                break;
-            case STATE_AUTH_LOCK:
-                text = "Locking…";
-                break;
-            case STATE_AUTH_WRONG:
-                text = "Wrong!";
-                break;
-            case STATE_I3LOCK_LOCK_FAILED:
-                text = "Lock failed!";
-                break;
-            default:
-                if (unlock_state == STATE_NOTHING_TO_DELETE) {
-                    text = "No input";
-                }
-                if (show_failed_attempts && failed_attempts > 0) {
-                    if (failed_attempts > 999) {
-                        text = "> 999";
-                    } else {
-                        snprintf(buf, sizeof(buf), "%d", failed_attempts);
-                        text = buf;
-                    }
-                    cairo_set_source_rgb(ctx, 1, 0, 0);
-                    cairo_set_font_size(ctx, 32.0);
-                }
-                break;
-        }
 
-        if (text) {
-            cairo_text_extents_t extents;
-            double x, y;
+        char *time_text = malloc(6);
 
-            cairo_text_extents(ctx, text, &extents);
-            x = BUTTON_CENTER - ((extents.width / 2) + extents.x_bearing);
-            y = BUTTON_CENTER - ((extents.height / 2) + extents.y_bearing);
+        time_t current_time = time(NULL);
+        struct tm *tm = localtime(&current_time);
+        strftime(time_text, 100, "%l:%M %p", tm);
 
-            cairo_move_to(ctx, x, y);
-            cairo_show_text(ctx, text);
-            cairo_close_path(ctx);
-        }
+        cairo_set_font_size(ctx, 32);
 
-        if (auth_state == STATE_AUTH_WRONG && (modifier_string != NULL)) {
-            cairo_text_extents_t extents;
-            double x, y;
+        cairo_text_extents_t time_extents;
+        double time_position_x, time_position_y;
+        cairo_text_extents(ctx, time_text, &time_extents);
+        time_position_x = BUTTON_CENTER - ((time_extents.width / 2) + time_extents.x_bearing);
+        time_position_y = BUTTON_CENTER - ((time_extents.height / 2) + time_extents.y_bearing);
 
-            cairo_set_font_size(ctx, 14.0);
+        cairo_move_to(ctx, time_position_x, time_position_y);
+        cairo_show_text(ctx, time_text);
+        cairo_close_path(ctx);
 
-            cairo_text_extents(ctx, modifier_string, &extents);
-            x = BUTTON_CENTER - ((extents.width / 2) + extents.x_bearing);
-            y = BUTTON_CENTER - ((extents.height / 2) + extents.y_bearing) + 28.0;
-
-            cairo_move_to(ctx, x, y);
-            cairo_show_text(ctx, modifier_string);
-            cairo_close_path(ctx);
-        }
+        free(time_text);
 
         /* After the user pressed any valid key or the backspace key, we
          * highlight a random part of the unlock indicator to confirm this
